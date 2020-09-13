@@ -1,0 +1,932 @@
+---
+title:  "I-405 Value of Time Study"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: scroll
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+knitr::opts_chunk$set(echo = FALSE)
+#knitr::opts_knit$set(root.dir = "/cloud/project")
+#knitr::opts_knit$set(root.dir = "C:/Users/adpaw/Documents/team_4")
+knitr::opts_knit$set(root.dir = "C:/Users/jsmit/Desktop/WSU/DataAnalytics/CPTS 424/Final Report")
+```
+
+
+```{r preprocessing, warning=FALSE}
+suppressMessages(library(tidyverse))
+suppressMessages(library(readxl))
+travel_times <- "Data/I-405_Travel_Times_-_PDR.xlsx"
+#Map all the sheets in the file to a dataframe
+data = suppressMessages(travel_times %>% excel_sheets() %>% set_names() %>% map(read_excel, path=travel_times))
+
+#maps all the data into the global environment
+s = list2env(data, envir = .GlobalEnv)
+#Changing table names for functionality
+NBR = `NB Rates`
+SBR = `SB Rates`
+# Change columns names 
+NBR <-select(NBR,starts_with("D")) %>% select_all(~str_replace(., "Displayed Toll Rate for +", ""))
+SBR <-select(SBR,starts_with("D")) %>% select_all(~str_replace(., "Displayed Toll Rate for +", ""))
+#Converting toll terminology to numerical data
+NBR[NBR=="OPEN"] <- 0
+NBR[NBR=="CLOSED"] <- 0
+NBR[NBR=="FREE"] <- 0
+NBR[NBR=="HOV ONLY"] <- 0
+SBR[SBR=="OPEN"] <- 0
+SBR[SBR=="FREE"] <- 0
+SBR[SBR=="HOV ONLY"] <- 0
+SBR[SBR=="CLOSED"] <- 0
+# Adding time column 
+NBR <- add_column(NBR,Time = `NB Rates`$Time,.before = 1)
+SBR <- add_column(SBR,Time = `SB Rates`$Time,.before = 1)
+# Removing columns with no data in them at all
+NBR<- NBR %>% select_if(~ !all(is.na(.)))
+SBR<- SBR %>% select_if(~ !all(is.na(.)))
+
+#convert POSIXct to character, strip the date and time zone
+TOTALGN$`15.06 miles` <- as.character(TOTALGN$`15.06 miles`, "%H:%M:%S") 
+TOTALHN$`15.06 miles` <- as.character(TOTALGN$`15.06 miles`, "%H:%M:%S")
+TOTALGS$`15.06 miles` <- as.character(TOTALGN$`15.06 miles`, "%H:%M:%S")
+TOTALHS$`15.06 miles` <- as.character(TOTALGN$`15.06 miles`, "%H:%M:%S")
+
+#convert character to time
+suppressMessages(library(chron))
+TOTALGN$`15.06 miles` <- chron(times = TOTALGN$`15.06 miles`)
+TOTALHN$`15.06 miles` <- chron(times = TOTALHN$`15.06 miles`)
+TOTALGS$`15.06 miles` <- chron(times = TOTALGS$`15.06 miles`)
+TOTALHS$`15.06 miles` <- chron(times = TOTALHS$`15.06 miles`)
+
+#rename the columns
+names(TOTALGN)[1] <-"Time"
+names(TOTALHN)[1] <-"Time"
+names(TOTALGS)[1] <-"Time"
+names(TOTALHS)[1] <-"Time"
+
+#converts toll rates into numeric data without the time column being affected
+NBR <- NBR %>% mutate_if(is.character, as.numeric,na.rm=TRUE)
+SBR <- SBR %>% mutate_if(is.character, as.numeric,na.rm=TRUE)
+#Fix time column
+NBR$Time <- as.character(NBR$Time, "%H:%M:%S") 
+SBR$Time <- as.character(SBR$Time, "%H:%M:%S") 
+library(chron)
+NBR$Time <- chron(times = NBR$Time)
+SBR$Time <- chron(times = SBR$Time)
+
+#column wise missing values
+na_countNBR <-sapply(NBR, function(y) sum(length(which(is.na(y)))))
+na_countSBR <-sapply(SBR, function(y) sum(length(which(is.na(y)))))
+#Remove columns that have any missing data
+NBR<- NBR %>% select_if(~ !any(is.na(.)))
+SBR<- SBR %>% select_if(~ !any(is.na(.)))
+
+volume <- read.csv("Data/I-405_Volumes_-_PDR.csv", header=TRUE,  stringsAsFactors = FALSE)
+
+#remove unneccesary second row
+volume <- volume[-c(1),]
+
+North <- volume[,0:11]
+South <- volume[,12:19]
+time_date <- volume[,0:3]
+South <- cbind(time_date, South)
+North[,"direction"] <- "North"
+South[,"direction"] <- "South"
+
+s1 <- cbind(South[,0:5], South[,12:12]) #combine date/time data, volume data for first mileage post, and direction data
+s1[,"Mileage"] <- s1[1,4] #create column to label milage post
+s1 <- s1[-c(1),] #remove initial label column 
+
+s2 <- cbind(time_date,South[,6:7],South[,12:12])
+s2[,"Mileage"] <- s2[1,4]
+s2 <- s2[-c(1),]
+
+s3 <- cbind(time_date, South[,8:9],South[,12:12])
+s3[,"Mileage"] <- s3[1,4]
+s3 <- s3[-c(1),]
+
+s4 <- cbind(time_date, South[,10:11],South[,12:12])
+s4[,"Mileage"] <- s4[1,4]
+s4 <- s4[-c(1),]
+
+n1 <- cbind(North[,0:5], North[,12:12])
+n1[,"Mileage"] <- n1[1,4]
+n1 <- n1[-c(1),]
+
+n2 <- cbind(time_date,North[,6:7],North[,12:12])
+n2[,"Mileage"] <- n2[1,4]
+n2 <- n2[-c(1),]
+
+n3 <- cbind(time_date, North[,8:9],North[,12:12])
+n3[,"Mileage"] <- n3[1,4]
+n3 <- n3[-c(1),]
+
+n4 <- cbind(time_date, North[,10:11],North[,12:12])
+n4[,"Mileage"] <- n4[1,4]
+n4 <- n4[-c(1),]
+
+lists=list(s1, s2, s3, s4)
+south_data <- data.frame()
+for (x in lists){
+  df <- x
+  temp <- grepl("H", df[1,4], fixed=TRUE)
+  temp1 <- grepl("H", df[1,5],  fixed=TRUE)
+  if (temp==TRUE & temp1==FALSE){
+    colnames(df) = c("Date", "Day_of_Week", "Time", "T_Volume", "G_Volume", "Direction", "Mile_Post")
+  }
+  else{
+   colnames(df) = c("Date", "Day_of_Week", "Time", "G_Volume", "T_Volume", "Direction", "Mile_Post")
+   }
+  df <- df[-c(1),]
+  south_data <- rbind(south_data,df)
+}
+
+lists=list(n1, n2, n3, n4)
+north_data <- data.frame()
+for (x in lists){
+  df <- x
+  temp <- grepl("H", df[1,4], fixed=TRUE)
+  temp1 <- grepl("H", df[1,5],  fixed=TRUE)
+  if (temp==TRUE & temp1==FALSE){
+    colnames(df) = c("Date", "Day_of_Week", "Time", "T_Volume", "G_Volume", "Direction", "Mile_Post")
+  }
+  else{
+   colnames(df) = c("Date", "Day_of_Week", "Time", "G_Volume", "T_Volume", "Direction", "Mile_Post")
+   }
+  df <- df[-c(1),]
+  north_data <- rbind(north_data,df)
+}
+
+volume_data <- rbind(north_data,south_data)
+
+library(chron)
+volume_data$Time <- chron(times = volume_data$Time)
+volume_data$Date <- as.Date(volume_data$Date, "%m/%d/%Y")
+library(dplyr)
+volume_data = volume_data %>% mutate(Day_of_Week = case_when(
+    Day_of_Week == 1  ~ "Mon",
+    Day_of_Week == 2 ~ "Tues",
+    Day_of_Week == 3 ~ "Wed",
+    Day_of_Week == 4 ~ "Thurs",
+    Day_of_Week == 5 ~ "Fri",
+    Day_of_Week == 6 ~ "Sat",
+    Day_of_Week == 7 ~ "Sun"))
+volume_data$T_Volume <- as.integer(volume_data$T_Volume)
+volume_data$G_Volume <- as.integer(volume_data$G_Volume)
+volume_data$Mileage <- as.numeric((volume_data$Mile_Post))
+volume_data <- subset(volume_data, select = -c(Mile_Post))
+#head(volume_data) #Commented out to avoid redundancy in the html report
+
+#filter out weekends,holidays, and snowstorm dates from the data
+#remove weekends from volume data
+newdata <- volume_data[ which(!(volume_data$Day_of_Week) %in% c('Sat','Sun')), ]
+#remove Holidays from volume data
+holidays <- c(as.Date("2019-01-01"), as.Date("2019-01-20"), as.Date("2019-02-17"), as.Date("2019-05-25"),as.Date("2019-07-03"), as.Date("2019-09-07"),as.Date("2019-11-11"), as.Date("2019-11-26"), as.Date("2019-12-25"))
+newdata2 <- newdata[ which(!(newdata$Date) %in% holidays), ]
+#remove snowstorm dates Feb 1st-Feb 15th
+library(dplyr)
+vol_data <- newdata2 %>% filter(newdata2$Date < "2019-02-01" | newdata2$Date > "2019-02-15" )
+
+#get list of remaining dates for 2019
+dates <- unique(vol_data$Date)
+
+HN = TOTALHN
+#filter northbound toll lane dates 
+names(HN) = gsub(pattern = " \\(.*", replacement = "", x = names(HN)) 
+names(HN) <- format(as.Date(names(HN), format = "%m/%d/%y"),
+    format = "%Y-%m-%d")
+NB_times <-HN[ , (as.Date(names(HN)) %in% dates)] 
+NB_times <-cbind(HN[,1], NB_times)
+row.names(NB_times) <- NB_times[,1]
+NB_times[1] <- NULL
+
+HS = TOTALHS
+#filter southbound toll lane dates 
+names(HS) = gsub(pattern = " \\(.*", replacement = "", x = names(HS)) 
+names(HS) <- format(as.Date(names(HS), format = "%m/%d/%y"),
+    format = "%Y-%m-%d")
+SB_times <-HS[ , (as.Date(names(HS)) %in% dates)] 
+SB_times <-cbind(HS[,1], SB_times)
+row.names(SB_times) <- SB_times[,1]
+SB_times[1] <- NULL
+
+
+#Subset columns of interest from volume data 
+vol = subset(volume_data, select=c("Date","Day_of_Week", "Time", "G_Volume", "T_Volume"))
+
+#Convert NBR date rows to columns and reshape 
+library(tidyr)
+long_NBR <- NBR %>% gather(Date, Toll_Rate, "01/02/2019":"12/31/2019")
+long_NBR$Date <- as.Date(long_NBR$Date, "%m/%d/%Y")
+#Join North Bound Rates table to Vol table, join on date and time.
+joinedN <- merge(data.frame(long_NBR, row.names=NULL), data.frame(vol, row.names=NULL), by = c("Date","Time"))
+#Add column for total volume (general + toll lane)
+joinedN$Total_Vol = joinedN$G_Volume + joinedN$T_Volume
+simple <- data.frame(joinedN$Toll_Rate, joinedN$Total_Vol)
+
+#Repeat for southbound lanes
+long_SBR <- SBR %>% gather(Date, Toll_Rate, "01/02/2019":"12/31/2019")
+long_SBR$Date <- as.Date(long_SBR$Date, "%m/%d/%Y")
+joinedS <- merge(data.frame(long_SBR, row.names=NULL), data.frame(vol, row.names=NULL), by = c("Date","Time"))
+joinedS$Total_Vol = joinedS$G_Volume + joinedS$T_Volume
+simpleS <- data.frame(joinedS$Toll_Rate, joinedS$Total_Vol)
+
+#convert seconds to hours (divide by 3600)
+SB_times_hrs <- SB_times/3600
+NB_times_hrs <- NB_times/3600
+
+#Calculate speed (v=distance/time, where distance is 15.06 miles)
+SB_mph <- 15.06/SB_times_hrs
+NB_mph <- 15.06/NB_times_hrs
+
+#Get the average speed for each time of day
+SB <- data.frame(row.names(SB_mph), rowMeans(SB_mph))
+names(SB)[1] <- "Time_of_Day"
+names(SB)[2] <- "Avg_Speed"
+rownames(SB) <- 1:nrow(SB)
+library(chron)
+SB$Time_of_Day <- chron(times=SB$Time_of_Day)
+
+NB <- data.frame(row.names(NB_mph), rowMeans(NB_mph))
+names(NB)[1] <- "Time_of_Day"
+names(NB)[2] <- "Avg_Speed"
+rownames(NB) <- 1:nrow(NB)
+NB$Time_of_Day <- chron(times=NB$Time_of_Day)
+
+#Read in summary stats to get average speed for Oct-Dec 2019
+NB_BtoR <- read_excel(path = "Data/NB_Bellevue_to_RoseHill.xlsx", range = "HOV TT Summary!A1:C289") 
+NB_Bto522 <- read_excel(path = "Data/NB_Bellevue_to_SR522.xlsx", range = "HOV TT Summary!A1:C289")
+SB_RtoB <- read_excel(path = "Data/SB_RoseHill_to_Bellevue.xlsx", range = "HOV TT Summary!A1:C289")
+SB_522toB <- read_excel(path = "Data/SB_SR522_to_Bellevue.xlsx", range = "HOV TT Summary!A1:C289")
+NB_148to522 <- read_excel(path = "Data/NB_148th_to_SR522.xlsx", range = "HOV TT Summary!A1:C289")
+SB_522to148 <- read_excel(path = "Data/SB_SR522_to_148th.xlsx", range = "HOV TT Summary!A1:C289") 
+NB_Bto527 <- read_excel(path = "Data/NB_Bellevue_to_SR527.xlsx", range = "HOV TT Summary!A1:C289")
+SB_527toB <- read_excel(path = "Data/SB_SR527_to_Bellevue.xlsx", range = "HOV TT Summary!A1:C289") 
+
+#Read in daily travel times for Oct-Dec 2019
+NB_BtoR_tt <- read_excel(path = "Data/NB_Bellevue_to_RoseHill.xlsx", sheet = "HOV TravelTimes")  %>% setNames(., c('Time', format(as.Date(as.numeric(names(.)[-1]), origin = '1899-12-30'), '%Y-%m-%d')))
+NB_Bto522_tt <- read_excel(path = "Data/NB_Bellevue_to_SR522.xlsx", sheet = "HOV TravelTimes")  %>% setNames(., c('Time', format(as.Date(as.numeric(names(.)[-1]), origin = '1899-12-30'), '%Y-%m-%d')))
+SB_RtoB_tt <- read_excel(path = "Data/SB_RoseHill_to_Bellevue.xlsx", sheet = "HOV TravelTimes")  %>% setNames(., c('Time', format(as.Date(as.numeric(names(.)[-1]), origin = '1899-12-30'), '%Y-%m-%d')))
+SB_522toB_tt <- read_excel(path = "Data/SB_SR522_to_Bellevue.xlsx", sheet = "HOV TravelTimes")  %>% setNames(., c('Time', format(as.Date(as.numeric(names(.)[-1]), origin = '1899-12-30'), '%Y-%m-%d')))
+NB_148to522_tt <- read_excel(path = "Data/NB_148th_to_SR522.xlsx", sheet = "HOV TravelTimes")  %>% setNames(., c('Time', format(as.Date(as.numeric(names(.)[-1]), origin = '1899-12-30'), '%Y-%m-%d')))
+SB_522to148_tt <- read_excel(path = "Data/SB_SR522_to_148th.xlsx", sheet = "HOV TravelTimes")  %>% setNames(., c('Time', format(as.Date(as.numeric(names(.)[-1]), origin = '1899-12-30'), '%Y-%m-%d')))
+NB_Bto527_tt <- read_excel(path = "Data/NB_Bellevue_to_SR527.xlsx", sheet = "HOV TravelTimes")  %>% setNames(., c('Time', format(as.Date(as.numeric(names(.)[-1]), origin = '1899-12-30'), '%Y-%m-%d')))
+SB_527toB_tt <- read_excel(path = "Data/SB_SR527_to_Bellevue.xlsx", sheet = "HOV TravelTimes")  %>% setNames(., c('Time', format(as.Date(as.numeric(names(.)[-1]), origin = '1899-12-30'), '%Y-%m-%d'))) 
+
+#get dates without weekends and holidays in Oct-Dec
+new_dates = dates[dates >= '2019-10-01'] 
+
+#calculte the speed for each day and time, for each segment, eliminate holidays and weekends 
+NB_BtoR_tt[,-1] =  NB_BtoR_tt[,-1] / 3600 #convert seconds to hours (seconds/3600)
+NB_BtoR_dist = mean(NB_BtoR$`Avg. Speed`* (NB_BtoR$`Avg. TTS`/3600)) #distance = speed * time to get the length of the stretch
+NB_BtoR_speed = NB_BtoR_dist/NB_BtoR_tt[,-1] #speed(mph) = distance(m)/time(hr)
+NB_BtoR_speed[NB_BtoR_speed < 0] <- NA  #set bad data values to NA
+NB_BtoR_speed <-NB_BtoR_speed[ , (as.Date(names(NB_BtoR_speed)) %in% new_dates)]
+
+NB_Bto522_tt[,-1] =  NB_Bto522_tt[,-1] / 3600 
+NB_Bto522_speed = (mean(NB_Bto522$`Avg. Speed`* (NB_Bto522$`Avg. TTS`/3600))) /NB_Bto522_tt[,-1] 
+NB_Bto522_speed[NB_Bto522_speed < 0] <- NA  
+NB_Bto522_speed <-NB_Bto522_speed[ , (as.Date(names(NB_Bto522_speed)) %in% new_dates)]
+
+SB_RtoB_tt[,-1] =  SB_RtoB_tt[,-1] / 3600 
+SB_RtoB_speed = (mean(SB_RtoB$`Avg. Speed`* (SB_RtoB$`Avg. TTS`/3600))) /SB_RtoB_tt[,-1] 
+SB_RtoB_speed[SB_RtoB_speed < 0] <- NA 
+SB_RtoB_speed <-SB_RtoB_speed[ , (as.Date(names(SB_RtoB_speed)) %in% new_dates)]
+
+SB_522toB_tt[,-1] =  SB_522toB_tt[,-1] / 3600 
+SB_522toB_speed = (mean(SB_522toB$`Avg. Speed`* (SB_522toB$`Avg. TTS`/3600))) /SB_522toB_tt[,-1] 
+SB_522toB_speed[SB_522toB_speed < 0] <- NA  
+SB_522toB_speed <-SB_522toB_speed[ , (as.Date(names(SB_522toB_speed)) %in% new_dates)]
+
+NB_148to522_tt[,-1] =  NB_148to522_tt[,-1] / 3600 
+NB_148to522_speed = (mean(NB_148to522$`Avg. Speed`* (NB_148to522$`Avg. TTS`/3600))) /NB_148to522_tt[,-1] 
+NB_148to522_speed[NB_148to522_speed < 0] <- NA
+NB_148to522_speed <-NB_148to522_speed[ , (as.Date(names(NB_148to522_speed)) %in% new_dates)]
+
+SB_522to148_tt[,-1] =  SB_522to148_tt[,-1] / 3600 
+SB_522to148_speed = (mean(SB_522to148$`Avg. Speed`* (SB_522to148$`Avg. TTS`/3600))) /SB_522to148_tt[,-1] 
+SB_522to148_speed[SB_522to148_speed < 0] <- NA 
+SB_522to148_speed <-SB_522to148_speed[ , (as.Date(names(SB_522to148_speed)) %in% new_dates)]
+
+NB_Bto527_tt[,-1] =  NB_Bto527_tt[,-1] / 3600 
+NB_Bto527_speed = (mean(NB_Bto527$`Avg. Speed`* (NB_Bto527$`Avg. TTS`/3600))) /NB_Bto527_tt[,-1] 
+NB_Bto527_speed[NB_Bto527_speed < 0] <- NA 
+NB_Bto527_speed <-NB_Bto527_speed[ , (as.Date(names(NB_Bto527_speed)) %in% new_dates)]
+
+SB_527toB_tt[,-1] =  SB_527toB_tt[,-1] / 3600 
+SB_527toB_speed = (mean(SB_527toB$`Avg. Speed`* (SB_527toB$`Avg. TTS`/3600))) /SB_527toB_tt[,-1] 
+SB_527toB_speed[SB_527toB_speed < 0] <- NA 
+SB_527toB_speed <-SB_527toB_speed[ , (as.Date(names(SB_527toB_speed)) %in% new_dates)] 
+
+#Add back in the time column in the appropriate format
+library(chron)
+NB_BtoR_speed = cbind(Time = chron(times = as.character(NB_BtoR_tt$Time, "%H:%M:%S")), NB_BtoR_speed)
+NB_Bto522_speed = cbind(Time = chron(times = as.character(NB_Bto522_tt$Time, "%H:%M:%S")), NB_Bto522_speed)
+SB_RtoB_speed = cbind(Time =chron(times = as.character(SB_RtoB_tt$Time, "%H:%M:%S")), SB_RtoB_speed)
+SB_522toB_speed = cbind(Time = chron(times = as.character(SB_522toB_tt$Time, "%H:%M:%S")), SB_522toB_speed)
+NB_148to522_speed = cbind(Time = chron(times = as.character(NB_148to522_tt$Time, "%H:%M:%S")), NB_148to522_speed)
+SB_522to148_speed = cbind(Time = chron(times = as.character(SB_522to148_tt$Time, "%H:%M:%S")), SB_522to148_speed)
+NB_Bto527_speed = cbind(Time =chron(times = as.character(NB_Bto527_tt$Time, "%H:%M:%S")), NB_Bto527_speed)
+SB_527toB_speed = cbind(Time = chron(times = as.character(SB_527toB_tt$Time, "%H:%M:%S")), SB_527toB_speed)
+
+library(tidyr)
+library(dplyr)
+
+#Match highway segment speed to volume data (averaged for Oct, Nov, Dec 2019, weekends and holidays omitted) 
+NB_NE53rd_vol = volume_data  %>% filter(Mileage == 15.63, Date %in% new_dates) %>% select(Date, Time, T_Volume) %>% spread( Date, T_Volume)
+NB_NE53rd = data.frame(Time=NB_NE53rd_vol[,1], Average_Vol=rowMeans(NB_NE53rd_vol[,-1]), Average_Speed = rowMeans(NB_BtoR_speed[,-1], na.rm = TRUE), Location ='NE53rd') 
+
+NB_NE100th_vol = volume_data %>% filter(Mileage == 18.70, Date %in% new_dates) %>% select(Date, Time, T_Volume) %>% spread( Date, T_Volume)
+NB_NE100th = data.frame(Time=NB_NE100th_vol[,1], Average_Vol=rowMeans(NB_NE100th_vol[,-1]), Average_Speed = rowMeans(NB_Bto522_speed[,-1], na.rm = TRUE),  Location ='NE100th')
+
+NB_SR522_vol = volume_data %>% filter(Mileage == 24.39, Date %in% new_dates) %>% select(Date, Time, T_Volume) %>% spread( Date, T_Volume)
+NB_SR522 = data.frame(Time=NB_SR522_vol[,1], Average_Vol=rowMeans(NB_SR522_vol[,-1]), Average_Speed = rowMeans(NB_148to522_speed[,-1], na.rm = TRUE), Location ='SR522')
+
+NB_SR527_vol = volume_data %>% filter(Mileage == 27.44, Date %in% new_dates, Direction == "North") %>% select(Date, Time, T_Volume) %>% spread( Date, T_Volume)
+NB_SR527 = data.frame(Time=NB_SR527_vol[,1], Average_Vol=rowMeans(NB_SR527_vol[,-1]), Average_Speed = rowMeans(NB_Bto527_speed[,-1], na.rm = TRUE), Location ='SR527')
+
+#Southbound Direction
+SB_NE53rd_vol = volume_data %>% filter(Mileage == 16.67, Date %in% new_dates) %>% select(Date, Time, T_Volume) %>% spread( Date, T_Volume)
+SB_NE53rd = data.frame(Time=SB_NE53rd_vol[,1], Average_Vol=rowMeans(SB_NE53rd_vol[,-1]), Average_Speed = rowMeans(SB_RtoB_speed[,-1], na.rm = TRUE), Location ='NE53rd')
+
+SB_NE100th_vol = volume_data %>% filter(Mileage == 19.21, Date %in% new_dates) %>% select(Date, Time, T_Volume) %>% spread( Date, T_Volume)
+SB_NE100th = data.frame(Time=SB_NE100th_vol[,1], Average_Vol=rowMeans(SB_NE100th_vol[,-1]), Average_Speed =rowMeans(SB_522toB_speed[,-1], na.rm = TRUE), Location ='NE100th' )
+
+SB_SR522_vol = volume_data %>% filter(Mileage == 23.51, Date %in% new_dates) %>% select(Date, Time, T_Volume) %>% spread( Date, T_Volume)
+SB_SR522 = data.frame(Time=SB_SR522_vol[,1], Average_Vol=rowMeans(SB_SR522_vol[,-1]), Average_Speed =rowMeans(SB_522to148_speed[,-1], na.rm = TRUE), Location ='SR522' )
+
+SB_SR527_vol = volume_data %>% filter(Mileage == 27.44, Date %in% new_dates, Direction == "South") %>% select(Date, Time, T_Volume) %>% spread( Date, T_Volume)
+SB_SR527 = data.frame(Time=SB_SR527_vol[,1], Average_Vol=rowMeans(SB_SR527_vol[,-1]), Average_Speed = rowMeans(SB_527toB_speed[,-1], na.rm=TRUE), Location ='SR527')
+
+#combine rows from all the milepost data into one dataframe
+SouthB = rbind(SB_SR527,SB_SR522, SB_NE100th, SB_NE53rd)
+NorthB = rbind(NB_NE53rd, NB_NE100th, NB_SR522, NB_SR527)
+
+#filter out weekends and holidays
+AN = TOTALGN[,-1]
+names(AN) <- format(as.Date(names(AN), format = "%m/%d/%y"),format = "%Y-%m-%d")
+AN = cbind(TOTALGN[,1], AN[as.character(dates)])
+BN = TOTALHN[,-1]
+names(BN) <- format(as.Date(names(BN), format = "%m/%d/%y"),format = "%Y-%m-%d")
+BN = cbind(TOTALHN[,1], BN[as.character(dates)])
+MN <- merge(AN,BN,by="Time")
+
+#Subtract Toll travel times(TOTALHN) from General travel times(TOTALGN) to get northbound time savings
+SN <- MN[,grepl("*\\.x$",names(MN))] - MN[,grepl("*\\.y$",names(MN))]
+tsavingsN <- cbind(MN[,1,drop=FALSE],SN)
+#Average the time savings for each time interval across all days, convert seconds to minutes
+mean_savingsN<-data.frame(Time=tsavingsN[,1], Northbound=(rowMeans(tsavingsN[,-1])/60))
+
+#filter out weekends and holidays
+AS = TOTALGS[,-1]
+names(AS) <- format(as.Date(names(AS), format = "%m/%d/%y"),format = "%Y-%m-%d")
+AS = cbind(TOTALGS[,1], AS[as.character(dates)])
+BS = TOTALHS[,-1]
+names(BS) <- format(as.Date(names(BS), format = "%m/%d/%y"),format = "%Y-%m-%d")
+BS = cbind(TOTALHS[,1], BS[as.character(dates)])
+
+#Subtract Toll travel times(TOTALHS) from General travel times(TOTALGS) to get southbound time savings
+MS <- merge(AS,BS,by="Time")
+SS <- MS[,grepl("*\\.x$",names(MS))] - MS[,grepl("*\\.y$",names(MS))]
+tsavingsS <- cbind(MS[,1,drop=FALSE],SS)
+#Average the time savings for each time interval across all days, convert seconds to minutes
+mean_savingsS<-data.frame(Time=tsavingsS[,1], Southbound=(rowMeans(tsavingsS[,-1])/60))
+
+#Join the northbound and southbound mean data
+means <-inner_join(mean_savingsN, mean_savingsS, by = "Time", copy = FALSE)
+
+#Filter northbound rates to omit times where the rate is zero for all days.
+Nrates <- NBR[rowSums(NBR[,-1]) > 0, ]
+
+#reshape rate data
+library(tidyr)
+long_rates <- Nrates %>% gather(Date, Toll_Rate, "01/02/2019":"12/31/2019")
+long_rates$Date <- as.Date(long_rates$Date, "%m/%d/%Y")
+
+#reshape time data
+long_times <- tsavingsN %>% gather(Date, Time_Saved, names(tsavingsN[,-1]))
+long_times$Date <- as.Date(long_times$Date, "%Y-%m-%d")
+long_times$Time_Saved <- long_times$Time_Saved/60 #convert seconds to minutes
+
+#get dataframe for Southbound lanes using same process
+#Filter southbound rates to omit times where the rate is zero for all days.
+Srates <- SBR[rowSums(SBR[,-1]) > 0, ]
+
+#reshape rate data
+library(tidyr)
+long_ratesS <- Srates %>% gather(Date, Toll_Rate, "01/02/2019":"12/31/2019")
+long_ratesS$Date <- as.Date(long_ratesS$Date, "%m/%d/%Y")
+
+#reshape time data
+long_timesS <- tsavingsS %>% gather(Date, Time_Saved, names(tsavingsS[,-1]))
+long_timesS$Date <- as.Date(long_timesS$Date, "%Y-%m-%d")
+long_timesS$Time_Saved <- long_timesS$Time_Saved/60 #convert seconds to minutes
+
+#join long_times and long_rates and toll rates for all 2019 Northbound data
+library(dplyr)
+long_rates$Date <- as.character(long_rates$Date, "%m/%d/%y")
+long_times$Date <- as.character(long_times$Date, "%m/%d/%y")
+joined_N <- long_rates %>% inner_join(long_times, by = c( "Date", "Time"))
+joined_N <-joined_N %>% filter(Toll_Rate > 0) 
+
+#join long_timesS and long_ratesS and toll rates for all 2019 Southbound data
+long_ratesS$Date <- as.character(long_ratesS$Date, "%m/%d/%y")
+long_timesS$Date <- as.character(long_timesS$Date, "%m/%d/%y")
+joined_S <- long_ratesS %>% inner_join(long_timesS, by = c( "Date", "Time"))
+joined_S <-joined_S %>% filter(Toll_Rate > 0)
+
+#combine north and southbound dataframes
+savings_and_rates_2019 = rbind(joined_N,joined_S)
+
+#total toll and general volumes accounts for anyone that changed lanes between two milemarkers
+NVol = subset(volume_data, Direction == "North")
+#use data set with no holidays and weekend
+M15 = select(NVol,Mileage, Date, Time, T_Volume, G_Volume) %>% filter(Mileage == 15.63) %>% mutate(Total = T_Volume)
+#select data from mile 18.70
+M18 = select(NVol,Mileage, Date, Time, T_Volume, G_Volume) %>% filter(Mileage == 18.70)
+#subset required columns
+M15 = select(M15, Date, Time, Total)
+M18 = select(M18, Date, Time, T_Volume)
+#compute differenes between total volume m15 and express volume in m18
+Diff18.15 = M18 - M15
+#update time and date with corresponding dates/times 
+Diff18.15$Date <- M18$Date
+Diff18.15$Time <- M18$Time
+Diff18.15 = Diff18.15 %>% rename(Diff_M18_M15 = T_Volume)
+
+
+#Filter northbound rates to omit times where the rate is zero for all days.
+Nrates <- NBR[rowSums(NBR[,-1]) > 0, ]
+
+#reshape rate data
+library(tidyr)
+long_rates <- Nrates %>% gather(Date, Toll_Rate, "01/02/2019":"12/31/2019")
+long_rates$Date <- as.Date(long_rates$Date, "%m/%d/%Y")
+
+#reshape time data
+long_times <- tsavingsN %>% gather(Date, Time_Saved, names(tsavingsN[,-1]))
+long_times$Date <-(format(as.Date(long_times$Date, format = "%Y-%m-%d"),format = "%m/%d/%Y"))
+long_times$Date <-as.Date(long_times$Date, format = "%m/%d/%Y")
+#filter rate and time savings to reduce number of data point to only the month of march
+march_rates <- long_rates[months(long_rates$Date) %in% month.name[3],]
+march_time_savings <- long_times[months(long_times$Date) %in% month.name[3],]
+rownames(march_time_savings) <- c()
+march_rates$Date <- as.character(march_rates$Date, "%m/%d/%y")
+march_time_savings$Date <- as.character(march_time_savings$Date, "%m/%d/%y")
+
+#join march time savings and toll rate data, for all times when there is a toll being charged
+library(dplyr)
+joined_March <- march_rates %>% inner_join(march_time_savings, by = c( "Date", "Time"))
+joined_March <-joined_March %>% filter(Toll_Rate > 0) 
+
+library(dplyr)
+N_tolls <- long_NBR %>% filter(Toll_Rate > 0)
+S_tolls <- long_SBR %>% filter(Toll_Rate > 0)
+tolls <- rbind(S_tolls, N_tolls)
+#get March dataframe for Southbound lanes using same process as in previous chunk
+#Filter southbound rates to omit times where the rate is zero for all days.
+Srates <- SBR[rowSums(SBR[,-1]) > 0, ]
+
+#reshape rate data
+library(tidyr)
+long_ratesS <- Srates %>% gather(Date, Toll_Rate, "01/02/2019":"12/31/2019")
+long_ratesS$Date <- as.Date(long_ratesS$Date, "%m/%d/%Y")
+
+#reshape time data
+long_timesS <- tsavingsS %>% gather(Date, Time_Saved, names(tsavingsS[,-1]))
+long_timesS$Date <-as.Date(format(as.Date(long_timesS$Date, format = "%Y-%m-%d"),format = "%Y-%m-%d"))
+
+#filter rate and time savings to reduce number of data point to only the month of march
+march_ratesS <- long_ratesS[months(long_ratesS$Date) %in% month.name[3],]
+march_time_savingsS <- long_timesS[months(long_timesS$Date) %in% month.name[3],]
+rownames(march_time_savingsS) <- c()
+march_ratesS$Date <- as.character(march_ratesS$Date, "%m/%d/%y")
+march_time_savingsS$Date <- as.character(march_time_savingsS$Date, "%m/%d/%y")
+
+#join march time savings and toll rate data, for all times when there is a toll being charged
+library(dplyr)
+joined_MarchS <- march_ratesS %>% inner_join(march_time_savingsS, by = c( "Date", "Time"))
+joined_MarchS <-joined_MarchS %>% filter(Toll_Rate > 0) 
+
+#Read in rates 
+NB_NE53rd_rates <- read.csv(file = "Data/Rates_1351.csv") #matches to Bellevue-Rosehill speeds and NE 53rd volumes
+#reformat headers to dates 
+names(NB_NE53rd_rates) <- gsub("Displayed.Toll.Rate.for.", "", names(NB_NE53rd_rates))
+names(NB_NE53rd_rates) <- gsub("\\.", "", names(NB_NE53rd_rates))
+names(NB_NE53rd_rates) <- c("TimeX", "Time", as.list(as.character(as.Date(colnames(NB_NE53rd_rates[3:ncol(NB_NE53rd_rates)]), format="%m%d%Y"))))
+#reformat TimeX column to be consistent with rest of data
+NB_NE53rd_rates$TimeX <- paste(NB_NE53rd_rates$TimeX, ":00", sep='')
+NB_NE53rd_rates$TimeX <- as.times(NB_NE53rd_rates$TimeX)
+ 
+
+NB_NE100th_rates <- read.csv(file = "Data/Rates_1585.csv") #matches to Bellevue-SR 522 speed and NE 100th volumes
+names(NB_NE100th_rates) <- gsub("Displayed.Toll.Rate.for.", "", names(NB_NE100th_rates))
+names(NB_NE100th_rates) <- gsub("\\.", "", names(NB_NE100th_rates))
+names(NB_NE100th_rates) <- c("TimeX", "Time", as.list(as.character(as.Date(colnames(NB_NE100th_rates[3:ncol(NB_NE100th_rates)]), format="%m%d%Y"))))
+NB_NE100th_rates$TimeX <- paste(NB_NE100th_rates$TimeX, ":00", sep='')
+NB_NE100th_rates$TimeX <- as.times(NB_NE100th_rates$TimeX)
+
+
+NB_SR522_rates <- read.csv(file = "Data/Rates_1879.csv") #matches NE 148th to SR 522 speed and SR 522 volumes
+names(NB_SR522_rates) <- gsub("Displayed.Toll.Rate.for.", "", names(NB_SR522_rates))
+names(NB_SR522_rates) <- gsub("\\.", "", names(NB_SR522_rates))
+names(NB_SR522_rates) <- c("TimeX", "Time", as.list(as.character(as.Date(colnames(NB_SR522_rates[3:ncol(NB_SR522_rates)]), format="%m%d%Y"))))
+NB_SR522_rates$TimeX <- paste(NB_SR522_rates$TimeX, ":00", sep='')
+NB_SR522_rates$TimeX <- as.times(NB_SR522_rates$TimeX)
+
+
+NB_SR527_rates <- read.csv(file = "Data/Rates_2526.csv") #matches Bellevue to SR 527 speed and SR 527 volumes
+names(NB_SR527_rates) <- gsub("Displayed.Toll.Rate.for.", "", names(NB_SR527_rates))
+names(NB_SR527_rates) <- gsub("\\.", "", names(NB_SR527_rates))
+names(NB_SR527_rates) <- c("TimeX", "Time", as.list(as.character(as.Date(colnames(NB_SR527_rates[3:ncol(NB_SR527_rates)]), format="%m%d%Y"))))
+NB_SR527_rates$TimeX <- paste(NB_SR527_rates$TimeX, ":00", sep='')
+NB_SR527_rates$TimeX <- as.times(NB_SR527_rates$TimeX)
+
+
+SB_NE53rd_rates <- read.csv(file = "Data/Rates_1926.csv") #matches to Rosehill- Bellevue speeds and NE 53rd volumes
+names(SB_NE53rd_rates) <- gsub("Displayed.Toll.Rate.for.", "", names(SB_NE53rd_rates))
+names(SB_NE53rd_rates) <- gsub("\\.", "", names(SB_NE53rd_rates))
+names(SB_NE53rd_rates) <- c("TimeX", "Time", as.list(as.character(as.Date(colnames(SB_NE53rd_rates[3:ncol(SB_NE53rd_rates)]), format="%m%d%Y"))))
+SB_NE53rd_rates$TimeX <- paste(SB_NE53rd_rates$TimeX, ":00", sep='')
+SB_NE53rd_rates$TimeX <- as.times(SB_NE53rd_rates$TimeX)
+
+
+SB_NE100th_rates <- read.csv(file = "Data/Rates_2072.csv") #matches to SR 522 - Bellevue speeds and NE 100th volumes
+names(SB_NE100th_rates) <- gsub("Displayed.Toll.Rate.for.", "", names(SB_NE100th_rates))
+names(SB_NE100th_rates) <- gsub("\\.", "", names(SB_NE100th_rates))
+names(SB_NE100th_rates) <- c("TimeX", "Time", as.list(as.character(as.Date(colnames(SB_NE100th_rates[3:ncol(SB_NE100th_rates)]), format="%m%d%Y"))))
+SB_NE100th_rates$TimeX <- paste(SB_NE100th_rates$TimeX, ":00", sep='')
+SB_NE100th_rates$TimeX <- as.times(SB_NE100th_rates$TimeX)
+
+
+SB_SR522_rates <- read.csv(file = "Data/Rates_2612.csv") #matches to SR 522 -148th speeds and SR 522 volumes
+names(SB_SR522_rates) <- gsub("Displayed.Toll.Rate.for.", "", names(SB_SR522_rates))
+names(SB_SR522_rates) <- gsub("\\.", "", names(SB_SR522_rates))
+names(SB_SR522_rates) <- c("TimeX", "Time", as.list(as.character(as.Date(colnames(SB_SR522_rates[3:ncol(SB_SR522_rates)]), format="%m%d%Y"))))
+SB_SR522_rates$TimeX <- paste(SB_SR522_rates$TimeX, ":00", sep='')
+SB_SR522_rates$TimeX <- as.times(SB_SR522_rates$TimeX)
+
+
+SB_SR527_rates <- read.csv(file = "Data/Rates_2782.csv") #matches to SR 527 -Bellevue speeds and SR 527 volumes
+names(SB_SR527_rates) <- gsub("Displayed.Toll.Rate.for.", "", names(SB_SR527_rates))
+names(SB_SR527_rates) <- gsub("\\.", "", names(SB_SR527_rates))
+names(SB_SR527_rates) <- c("TimeX", "Time", as.list(as.character(as.Date(colnames(SB_SR527_rates[3:ncol(SB_SR527_rates)]), format="%m%d%Y"))))
+SB_SR527_rates$TimeX <- paste(SB_SR527_rates$TimeX, ":00", sep='')
+SB_SR527_rates$TimeX <- as.times(SB_SR527_rates$TimeX)
+
+Temp_vol_data <- cbind(vol_data)
+colnames(Temp_vol_data) <-c('Date', 'Day_of_Week', 'Time','T_Volume', 'G_Volume','Direction','Mileage')
+Temp_vol_data$Date <- as.Date(Temp_vol_data$Date, format='%Y-%m-%d') 
+
+#Break down the data to match with the rate sheets
+N_Temp_vol_data <-data.frame(Temp_vol_data[Temp_vol_data$Direction=="North",])
+N53_Temp_vol_data <- data.frame(N_Temp_vol_data[N_Temp_vol_data$Mileage==15.63,])
+N100_Temp_vol_data <- data.frame(N_Temp_vol_data[N_Temp_vol_data$Mileage==18.7,])
+N522_Temp_vol_data <- data.frame(N_Temp_vol_data[N_Temp_vol_data$Mileage==24.39,])
+N527_Temp_vol_data <- data.frame(N_Temp_vol_data[N_Temp_vol_data$Mileage==27.44,])
+
+S_Temp_vol_data <- data.frame(Temp_vol_data[Temp_vol_data$Direction=="South",])
+S53_Temp_vol_data <- data.frame(S_Temp_vol_data[S_Temp_vol_data$Mileage==16.67,])
+S100_Temp_vol_data <- data.frame(S_Temp_vol_data[S_Temp_vol_data$Mileage==19.21,])
+S522_Temp_vol_data <- data.frame(S_Temp_vol_data[S_Temp_vol_data$Mileage==23.51,])
+S527_Temp_vol_data <- data.frame(S_Temp_vol_data[S_Temp_vol_data$Mileage==27.44,])
+
+vol_data_list <- list(N53_Temp_vol_data, N100_Temp_vol_data, N522_Temp_vol_data, N527_Temp_vol_data,S53_Temp_vol_data, S100_Temp_vol_data, S522_Temp_vol_data, S527_Temp_vol_data)
+
+rate_data_list <- list(NB_NE53rd_rates, NB_NE100th_rates, NB_SR522_rates,NB_SR527_rates, SB_NE53rd_rates,SB_NE100th_rates, SB_SR522_rates, SB_SR527_rates)
+
+#resulting dataframe
+vol_rates_data <- data.frame()
+
+#run through these lists to match rate data with correct location, date, and time
+library(dplyr)
+k=1
+while(k <= 8){
+  temp_rate <- rate_data_list[[k]]
+  temp_vol <- vol_data_list[[k]]
+  tolls2 <- data.frame() 
+  i=0
+  while(i <= (NROW(temp_vol)/288)-1) {
+      x <- ((i*288))
+      if (i == 0)
+        x=1
+      temp <- data.frame(temp_rate[,colnames(temp_rate)==(as.character(temp_vol$Date[x]))])
+      tolls2 <- rbind(tolls2, temp)   
+      i=i+1  
+  }
+
+  colnames(tolls2) <- c("Toll")
+  temp_vol <- cbind(temp_vol, tolls2)
+  
+  if (k==1)
+    vol_rates_data <- temp_vol
+  else
+    vol_rates_data <- rbind(vol_rates_data, temp_vol)
+  
+  k=k+1
+
+}
+
+#clean up rate values
+vol_rates_data$Toll <- as.character(vol_rates_data$Toll)
+vol_rates_data$Toll[vol_rates_data$Toll == "OPEN"] <- '0'
+vol_rates_data$Toll[vol_rates_data$Toll =="CLOSED"] <- '0'
+vol_rates_data$Toll[vol_rates_data$Toll =="FREE"] <- "0"
+vol_rates_data$Toll[vol_rates_data$Toll =="HOV ONLY"] <- "0"
+vol_rates_data$Toll <-as.numeric(vol_rates_data$Toll)
+
+library(dplyr)
+vrd <- vol_rates_data %>% filter(Toll != 0)
+
+#Prepare speed data to be joined with volume and rates
+s1 = NB_BtoR_speed %>% gather(Date, Speed, -Time) %>% add_column(Location = 'NE53rd', Mileage = 15.63, Direction = as.factor("North")) %>%
+mutate(Date = as.Date(Date))
+s2 = NB_Bto522_speed %>% gather(Date, Speed, -Time) %>% add_column(Location = 'NE100th', Mileage = 18.7, Direction =as.factor("North")) %>%
+mutate(Date = as.Date(Date))
+s3 = SB_RtoB_speed %>% gather(Date, Speed, -Time) %>% add_column(Location = 'NE53rd', Mileage = 16.67, Direction = as.factor("South")) %>%
+mutate(Date = as.Date(Date))
+s4 = SB_522toB_speed %>% gather(Date, Speed, -Time) %>% add_column(Location = 'NE100th', Mileage = 19.21, Direction = as.factor("South")) %>%
+mutate(Date = as.Date(Date))
+s5 = NB_148to522_speed %>% gather(Date, Speed, -Time) %>% add_column(Location = 'SR522', Mileage = 24.39, Direction = as.factor("North")) %>%
+mutate(Date = as.Date(Date))
+s6 = SB_522to148_speed %>% gather(Date, Speed, -Time) %>% add_column(Location = 'SR522', Mileage = 23.51, Direction =as.factor("South")) %>%
+mutate(Date = as.Date(Date))
+s7 = NB_Bto527_speed %>% gather(Date, Speed, -Time) %>% add_column(Location = 'SR527', Mileage = 27.44, Direction = as.factor("North")) %>%
+mutate(Date = as.Date(Date))
+s8 = SB_527toB_speed %>% gather(Date, Speed, -Time) %>% add_column(Location = 'SR527', Mileage = 27.44, Direction = as.factor("South")) %>%
+mutate(Date = as.Date(Date))
+
+nspeed = rbind(s1,s2,s5,s7)
+sspeed = rbind(s3,s4,s6,s8)
+#join on  mileage, time, and date
+nres = inner_join(nspeed, vrd, by = c("Date", "Time", "Mileage"))
+sres = inner_join(sspeed, vrd, by = c("Date", "Time", "Mileage")) 
+sres = sres[sres$Time >= "06:00:00" & sres$Time <= "10:00:00",] #Filter peak times from 6AM to 10AM
+nres = nres[nres$Time >= "15:00:00" & nres$Time <= "19:00:00",] #Filter peak times from 3PM to 7PM
+res=rbind(nres,sres)
+#Get average speed for each toll rate
+n_agg = aggregate(nres, list(Toll_rate = nres$Toll), mean, na.rm=TRUE)
+s_agg = aggregate(sres, list(Toll_rate = sres$Toll), mean, na.rm=TRUE)
+
+#######VOLUME DIFFERENCE CALCULATIONS########
+TM15 = filter(vol_data, Direction == "North", Mileage == 15.63, (between(Time, 15/24, 18/24))) %>%   select(Date, Time, T_Volume, G_Volume) %>% group_by(Date) %>% summarise(meanT = mean(T_Volume), meanG = mean(G_Volume))
+TM18 = filter(vol_data, Direction == "North", Mileage == 18.70, (between(Time, 15/24, 18/24))) %>%   select(Date, Time, T_Volume, G_Volume) %>% group_by(Date) %>% summarise(meanT = mean(T_Volume), meanG = mean(G_Volume))
+TM24 = filter(vol_data, Direction == "North", Mileage == 24.39, (between(Time, 15/24, 18/24))) %>%   select(Date, Time, T_Volume, G_Volume) %>% group_by(Date) %>% summarise(meanT = mean(T_Volume), meanG = mean(G_Volume))
+TM27 = filter(vol_data, Direction == "North", Mileage == 27.44, (between(Time, 15/24, 18/24))) %>%   select(Date, Time, T_Volume, G_Volume) %>% group_by(Date) %>% summarise(meanT = mean(T_Volume), meanG = mean(G_Volume))
+
+SM16 = filter(vol_data, Direction == "South", Mileage == 16.67, (between(Time, 5/24, 9/24))) %>%   select(Date, Time, T_Volume, G_Volume) %>% group_by(Date) %>% summarise(meanT = mean(T_Volume), meanG = mean(G_Volume))
+SM19 = filter(vol_data, Direction == "South", Mileage == 19.21, (between(Time, 5/24, 9/24))) %>%   select(Date, Time, T_Volume, G_Volume) %>% group_by(Date) %>% summarise(meanT = mean(T_Volume), meanG = mean(G_Volume))
+SM23 = filter(vol_data, Direction == "South", Mileage == 23.51, (between(Time, 5/24, 9/24))) %>%   select(Date, Time, T_Volume, G_Volume) %>% group_by(Date) %>% summarise(meanT = mean(T_Volume), meanG = mean(G_Volume))
+SM27 = filter(vol_data, Direction == "South", Mileage == 27.44, (between(Time, 5/24, 9/24))) %>%   select(Date, Time, T_Volume, G_Volume) %>% group_by(Date) %>% summarise(meanT = mean(T_Volume), meanG = mean(G_Volume))
+
+######### MP 15 to other mileposts
+NB15.18 = data.frame(Date =TM15$Date, Diff = TM15$meanT - TM18$meanT, Origin = "NE 53rd (MP15)", Dest = "NE 100th (MP18)")
+NB15.24 = data.frame(Date =TM15$Date, Diff = TM15$meanT - TM24$meanT, Origin = "NE 53rd (MP15)", Dest = "SR 522 (MP24)")
+NB15.27 = data.frame(Date =TM15$Date, Diff = TM15$meanT - TM27$meanT, Origin = "NE 53rd (MP15)", Dest = "SR 527 (MP27)")
+############ MP 18 to other mileposts
+NB18.24 = data.frame(Date =TM18$Date, Diff = TM18$meanT - TM24$meanT, Origin = "NE 100th (MP18)", Dest = "SR 522 (MP24)")
+NB18.27 = data.frame(Date =TM18$Date, Diff = TM18$meanT - TM27$meanT, Origin = "NE 100th (MP18)", Dest = "SR 527 (MP27)")
+### MP 24 to other mileposts
+NB24.27 = data.frame(Date =TM24$Date, Diff = TM24$meanT - TM27$meanT, Origin = "SR 522 (MP24)", Dest = "SR 527 (MP27)")
+NB15 = rbind(NB15.18, NB15.24, NB15.27, NB18.24, NB18.27, NB24.27)
+
+######### MP 15 to other mileposts
+SB15.18 = data.frame(Date =TM15$Date, Diff = SM23$meanT - SM27$meanT, Origin = "SR 527 (MP27)", Dest = "SR 522 (MP23)")
+SB15.24 = data.frame(Date =TM15$Date, Diff = SM19$meanT - SM27$meanT, Origin = "SR 527 (MP27)", Dest = "NE 100th (MP19)")
+SB15.27 = data.frame(Date =TM15$Date, Diff = SM16$meanT - SM27$meanT, Origin = "SR 527 (MP27)", Dest = "NE 53rd (MP16)")
+############ MP 18 to other mileposts
+SB18.24 = data.frame(Date =TM18$Date, Diff = SM19$meanT - SM23$meanT, Origin = "SR 522 (MP23)", Dest = "NE 100th (MP19)")
+SB18.27 = data.frame(Date =TM18$Date, Diff = SM16$meanT - SM23$meanT, Origin = "SR 522 (MP23)", Dest = "NE 53rd (MP16)")
+### MP 24 to other mileposts
+SB24.27 = data.frame(Date =TM24$Date, Diff = SM16$meanT - SM19$meanT, Origin = "NE 100th (MP19)", Dest = "NE 53rd (MP16)")
+SB15 = rbind(SB15.18, SB15.24, SB15.27, SB18.24, SB18.27, SB24.27)
+
+```
+
+
+Table of Contents
+===================================== 
+    
+1. [Executive Summary]
+2. [Speed Relationships]  
+  *Average speed by time of day  
+  *Speed by location  
+  *Speed distributions by toll rate  
+  *Speed and rate relationships  
+3. [Toll Information]  
+  *Toll frequency  
+  *Toll rate and time of day  
+4. [Time Savings]  
+  *Time savings by time of day  
+  *Toll rate and amount of time saved  
+5. [Volume analyses]  
+  *Difference in volume between mileposts 15 and 18  
+  *Toll lane volume by location  
+
+
+Executive Summary
+===================================== 
+    
+The primary objective of this project was to analyze drivers' value of time while traveling on the I-405 highway during 2019. The value of time estimates how much a driver is willing to pay to save time. This analysis can be applied to a wide range of industries, from airlines to public transportation services. Through the duration of this project, data was used containing volume counts, travel times, and toll rates for particular segments of the I-405 highway. The data was analyzed to explore relationships between time of day, speed, volume, and toll rate. The study also calculated the travel time variability. The team hypothesized that the findings would be comparable to existing published studies on this and similar tollways. The results produced a value of travel time in the toll lane of $27.08. This value is lower than the most recent previous study. The discrepancy is likely due to different equations used, a wider range of factors considered based on data that was not available for use in this project. Future research could evaluate data from prior years using a consistent methodology, and then analyze patterns in the results to find possible trends. Demographic data, information on public transit ridership, and usage trends in the prevalence of various technologies, could all be investigated as potentially influencing factors. 
+
+Speed Relationships {data-orientation=rows}
+===================================== 
+
+Row
+-------------------------------------
+    
+### How travel speeds change through peak travel times 
+```{r PlotSpeedvTimeofDay, warning = FALSE, message = FALSE, fig.width=5, fig.height=5}
+
+#plot average speed by time of day
+library(ggplot2)
+p1 = ggplot() + geom_point(data=SB, aes(x=SB$Time_of_Day, y=SB$Avg_Speed, color='Southbound')) + geom_point(data=NB, aes(x=NB$Time_of_Day, y=NB$Avg_Speed, color='Northbound'))+  scale_x_time( name= "Time of Day", limits = c('.2','.83'), breaks = c( '.25', '.33','.416','.5', '.583','.66', '.75', '.83'),  labels = c( "6am", "8am", "10am", "12pm","2pm", "4pm", "6pm", "8pm"))  + ylab("Average Speed (mph)")  + ylab("Average Speed (mph)") + ggtitle("Average Toll Lane Speed - 2019")  +  geom_hline(yintercept = 45, color='black', linetype = 3) + scale_color_manual(values = c('Northbound' = 'darkblue','Southbound' = 'red')) +labs(color = 'Direction')
+
+library(plotly)
+ggplotly(p1)
+```
+
+Row
+-------------------------------------
+###How Southbound speed varies by location
+```{r plot_south_speed_by_location, message= FALSE, warning= FALSE}
+library(ggplot2)
+
+#model average speed at each milepost across the day for Southbound direction. Weekends and holidays are excluded
+p2 = ggplot(SouthB, aes(Time, Location, fill= Average_Speed)) + geom_tile() +  scale_x_time( name= "Time of Day", limits = c('.25','.85'), breaks = c( '.25', '.33','.416','.5', '.583','.66', '.75', '.83'),  labels = c( "6am", "8am", "10am", "12pm","2pm", "4pm", "6pm", '8pm')) + xlab("Time of Day") + ylab("Location") + scale_fill_gradient2(low = "red", mid = "yellow", high = "chartreuse3", midpoint = 50, space = "Lab", guide = "colourbar", aesthetics = "fill", limits = c(40,60)) + ggtitle("Southbound Toll Lane Speeds")+ labs(fill="Average Speed")
+
+
+p2
+
+```
+
+### How Northbound speed varies by location
+```{r plot_north_speed_by_location, message= FALSE, warning= FALSE}
+library(ggplot2)
+
+#model average speed at each milepost across the day for Northbound direction. 
+p3 = ggplot(NorthB, aes(Time, Location, fill= Average_Speed)) + geom_tile() +  scale_x_time( name= "Time of Day", limits = c('.25','.85'), breaks = c( '.25', '.33','.416','.5', '.583','.66', '.75', '.83'),  labels = c( "6am", "8am", "10am", "12pm","2pm", "4pm", "6pm", "8pm")) + xlab("Time of Day") + ylab("Location") + scale_fill_gradient2(low = "red", mid = "yellow", high = "chartreuse3", midpoint = 50, space = "Lab", guide = "colourbar", aesthetics = "fill", limits = c(40,60))+ ggtitle("Northbound Toll Lane Speeds") + labs(fill="Average Speed")
+
+
+p3
+
+```
+
+Row
+-------------------------------------
+
+###How the October - December toll lane speed observations are distributed for different toll rates 
+```{r plot_speed_vs_rate_north, warning= FALSE, message= FALSE}
+#plot speed distribution for each toll rate, Oct - Dec, filtered for peak times and no weekends or holidays
+#install.packages("ggridges")
+library(ggplot2)
+library(ggridges)
+library(dplyr)    
+p4 = ggplot( filter(nres, Toll %% 1 == 0),  aes(x = Speed, y = as.factor(Toll))) + geom_density_ridges_gradient(aes(fill = ..x..)) + ylab("Toll Rate($)") + xlab("Speed(mph)") + ggtitle("Northbound Speed Distribution by Toll Rate") +  scale_fill_gradientn(colours= c("red", "yellow", "chartreuse3"),name = "Speed", values = (c(0, .6,.7,.85,1))) + labs(caption="These speeds were observed on non-holiday weekdays between 3PM and 7PM for dates from October /n through December 2019") + theme(plot.caption = element_text(hjust = 0))
+
+p4
+
+p5 = ggplot( filter(sres, Toll %% 1 == 0),  aes(x = Speed, y = as.factor(Toll))) + geom_density_ridges_gradient(aes(fill = ..x..)) + ylab("Toll Rate ($)") + xlab("Speed(mph)") + ggtitle("Southbound Speed Distribution by Toll Rate")  +  scale_fill_gradientn(colours= c("red", "yellow", "chartreuse3"),name = "Speed", values = (c(0, .6,.7,.85,1))) + labs(caption="These speeds were observed on non-holiday weekdays between 6AM and 10AM for dates from October/n through December 2019") + theme(plot.caption = element_text(hjust = 0))
+
+p5
+```
+
+Row
+-------------------------------------
+
+###Relationship between average speed in the toll lanes at peak hours and the toll rate being charged at that time
+```{r plot_avg_speed_vs_rate}
+#fit a linear model to southboud data and plot
+linearMod <- lm(Toll ~ Speed, data=s_agg) 
+#print(linearMod)
+#summary(linearMod)
+plot(Toll ~ Speed, data = s_agg, ylab = "Toll($)", xlab = "Speed(mph)", col = "red", main = "Average Toll Lane Speed by Toll Rate - Southbound", xlim = c(45,60))
+abline(coef(linearMod)[1:2], col = "red")
+cf <- round(coef(linearMod), 2) # rounded coefficients for better output
+eq <- paste0("Toll = ", cf[1], ifelse(sign(cf[2])==1, " + ", " - "), abs(cf[2]), " X Speed")
+mtext(eq, 1, line=-2)
+
+#NB data is not normal, so skip linear model and just scatterplot
+plot(Toll ~ Speed, data = n_agg, ylab = "Toll($)", xlab = "Speed(mph)", col = "blue", main = "Average Toll Lane Speed by Toll Rate - Northbound", xlim = c(45,60)) 
+
+```
+
+
+Row
+-------------------------------------
+###About these plots
+Speed averages for each toll rate were calculated from non-holiday weekdays between 3PM and 7PM for northbound lanes, and from 6AM to 10AM for southbound lanes.  Data was available for dates from October through December 2019.
+
+Row
+-------------------------------------
+
+Toll Information
+=====================================     
+
+### What toll rate is charged the most often
+```{r plot_toll_frequency, fig.width=7, fig.height=5}
+library(ggplot2)
+# histogram to see how frequently toll rates occur 
+p6 = ggplot(data=tolls, aes(tolls$Toll_Rate)) + 
+  geom_histogram(breaks=seq(0, 10, by = 1), col="black", fill="darkmagenta") + 
+  labs(title="Frequency Distribution of Toll Rates for Both Directions", x="Toll Rate($)", y="Frequency(number of times a toll is charged)") + scale_x_continuous( breaks=c(0:10), labels = c(0:10)) 
+
+p6
+```
+    
+
+###How the toll rate changes through the day
+```{r March_toll_rates, message = FALSE, warning= FALSE}
+library(chron)
+#do a time series plot of date time and amount of toll to see frequency
+#plot time on x axis and toll on y axis
+library(ggplot2)
+p7 = ggplot() + geom_point(data=joined_March, aes(x=Time, y=Toll_Rate, color='Northbound')) + geom_smooth(data=joined_March, aes(x=Time, y=Toll_Rate)) + geom_point(data=joined_MarchS, aes(x=Time, y=Toll_Rate, color='Southbound'))+ geom_smooth(data=joined_MarchS, aes(x=Time, y=Toll_Rate), color = 'darkred')  +  scale_x_time( name= "Time of Day", limits = c('.2','.83'), breaks = c( '.25', '.33','.416','.5', '.583','.66', '.75','.83'),  labels = c( "6am", "8am", "10am", "12pm","2pm", "4pm", "6pm", "8pm"))  + ylab("Average Speed (mph)")  + ylab("Toll Rate ($)") + ggtitle("Amount of Toll by Time of Day in March") + ylim(c(0,10)) + scale_color_manual(values = c('Northbound' = 'darkblue','Southbound' = 'red')) +labs(color = 'Direction') 
+
+library(plotly)
+ggplotly(p7)
+```
+
+###About this plot
+This plot shows the toll rate charged at each time of day during March 2019. Weekends and holidays were removed from this data set.
+
+Time Savings
+=====================================     
+
+###How much time is saved by taking the toll lane at various times throughout the day
+```{r plot_avg_time_savings, warning = FALSE, message= FALSE, fig.width=7, fig.height=5}
+
+#plot time savings versus time of day
+library(ggplot2)
+p8 = ggplot() +
+  geom_line(data =means, aes(y = Northbound, x= Time, color = "Northbound")) + 
+  geom_line(data = means, aes(y = Southbound, x = Time,  color = "Southbound"))  +  scale_x_time( name= "Time of Day", limits = c('.2','.83'), breaks = c( '.25', '.33','.416','.5', '.583','.66', '.75', '.83'),  labels = c( "6am", "8am", "10am", "12pm","2pm", "4pm", "6pm", "8pm"))  + ylab("Average Speed (mph)")  + ylab("Mean Travel Time Savings(minutes)") + scale_color_manual(values = c('Northbound' = 'darkblue','Southbound' = 'red')) +labs(color = 'Direction') + ggtitle("Average Time Savings by Time of Day")
+library(plotly)
+ggplotly(p8)
+```
+
+###About this plot
+These time savings are calculated by finding the difference between toll lane and general lane travel times. Travel times used were for the full trip length of the tollway, averaged across all non holiday, weekend, or severe weather event dates in 2019.
+
+
+### How the toll rate is related to the amount of time saved
+```{r boxplot_time_saved_v_toll}
+library(ggplot2)
+#boxplot the distributions of time saved by rate group
+savings_and_rates_2019$Groups <- cut(savings_and_rates_2019$Toll_Rate, breaks=c(0.74,1,2,3,4,5,6,7,8,9,10))
+p9 = ggplot(savings_and_rates_2019, aes(x=Groups, y=Time_Saved, fill=Groups)) + 
+    geom_boxplot(alpha=0.3) +  theme(legend.position="none") +  ylab("Travel Time Saved (minutes)") + xlab("Toll Rate($)") + ggtitle("Travel Time Saved by Toll Rate ")+ scale_x_discrete(labels=c("$.75 - $1.00", "$1.25 - $2.00", "$2.25 - $3.00", "$3.25 - $4.00", "$4.25 - $5.00", "$5.25 - $6.00", "$6.25 - $7.00", "$7.25 - $8.00", "$8.25 - $9.00", "$9.25 - $10.00")) + theme(axis.text.x = element_text(size = 12, angle=90)) 
+
+library(plotly)
+ggplotly(p9)
+```
+
+###About this plot
+This plot is for all 2019 data with weekends, holidays, and snowstorm dates included, for both north and southbound travel directions. Travel time saved is calculated as the differece in travel time between the toll and general lanes.
+
+Volume Analyses {data-orientation=rows}
+=====================================     
+
+Row
+-------------------------------------
+###Northbound difference in volume between four mileposts
+```{r difference_plot}
+library(plotly)
+d1 = ggplot(data = NB15, aes(x=Origin, y=Dest, z = Diff)) + stat_summary_2d() + scale_fill_gradientn(colors = c("red", "green"), name = "Difference") +ggtitle("NB ETL Volume Changes During Peak Hours (3-7 PM)") 
+d1
+
+```
+
+###Southbound difference in volume between four mileposts
+```{r difference_plotSB, message=FALSE, warning=FALSE}
+
+library(RColorBrewer)
+d2 = ggplot(data = SB15, aes(x=Origin, y=Dest, z = Diff)) + stat_summary_2d() + scale_fill_gradientn(colors = c("red", "green"), name = "Difference")+ggtitle("SB ETL Volume Changes During Peak Hours (5-9 AM)") 
+d2
+```
+
+Row
+-------------------------------------
+###How Northbound toll lane volume changes by location
+```{r plot_vol_by_location_n, message= FALSE,warning= FALSE}
+library(ggplot2)
+#model  volume at each milepost across the day for Northbound direction. Holidays and weekends are currently excluded from the average volume calculation.
+p11= ggplot(NorthB, aes(Time, Location, fill= Average_Vol)) + geom_tile() +  scale_x_time( name= "Time of Day", limits = c('.25','.85'), breaks = c( '.25', '.33','.416','.5', '.583','.66', '.75', '.83'),  labels = c( "6am", "8am", "10am", "12pm","2pm", "4pm", "6pm", "8pm")) + xlab("Time of Day") + ylab("Location") + scale_fill_gradient2(low = "chartreuse3", mid = "yellow", high = "red", midpoint = 150, space = "Lab", guide = "colourbar", aesthetics = "fill", limits=c(0,300))+ ggtitle("Northbound Toll Lane Volume") + labs(fill="Average Volume")
+
+p11
+
+```
+
+###How Southbound toll lane volume changes by location
+```{r plot_vol_by_location_s, message= FALSE,warning= FALSE}
+#model volume at each milepost across the day for Southbound direction. Holidays and weekends are currently excluded from the average volume calculation.
+p12 = ggplot(SouthB, aes(Time, Location, fill= Average_Vol)) + geom_tile() +  scale_x_time( name= "Time of Day", limits = c('.25','.85'), breaks = c( '.25', '.33','.416','.5', '.583','.66', '.75', '.83'),  labels = c( "6am", "8am", "10am", "12pm","2pm", "4pm", "6pm", '8pm')) + xlab("Time of Day") + ylab("Location") + scale_fill_gradient2(low = "chartreuse3", mid = "yellow", high = "red", midpoint = 150, space = "Lab", guide = "colourbar", aesthetics = "fill", limits=c(0,300)) + ggtitle("Southbound Toll Lane Volume")+ labs(fill="Average Volume")
+
+p12
+```
+
+Row
+-------------------------------------
+
+These plots use the Oct-Dec 2019 data, where holidays and weekends have been removed from consideration.
